@@ -1,4 +1,4 @@
-# Group 1 — System Architecture, Backend & Database
+# Group 1 — System Architecture, Backend & Database (Phase 1)
 
 Members: Swayam, Mayur, Saish
 Folders you own: backend/core-api/, backend/database/
@@ -12,22 +12,20 @@ The backbone the rest of the app plugs into:
 - User Authentication Backend — /auth/register, /auth/login, /auth/logout in Core
   API. /auth/login doesn't check passwords itself — it forwards to the Kerberos AS
   (Group 3) and turns the result into a session for the frontend to use.
-- Database & Key Management — schema for users, sessions, principals' long-term keys, and
-  a login_events table (timestamp, user, success/failure, IP) that the anomaly detection
-  work will read from later.
+- Database — schema for users and sessions. (Key management and anomaly detection are Phase 2).
 
 ## Suggested split (adjust as you like)
 
 - One person: Core API skeleton + /health, /auth/register, /auth/login/logout routes
-- One person: Database schema (users, sessions, keys, login_events) + connection/session layer
+- One person: Database schema (users, sessions) + connection/session layer
 - One person: Wiring Core API ↔ AS (the actual HTTP call to /as/authenticate) + session
   token issuance/validation for the frontend
 
 ## First tasks
 
 1. Stand up backend/core-api (uvicorn main:app --reload --port 8000), confirm /health works.
-2. Design and create the schema in backend/database — at minimum: users, sessions,
-   login_events. Share the schema in the group chat before anyone else builds against it.
+2. Design and create the schema in backend/database — at minimum: users, sessions.
+   Share the schema in the group chat before anyone else builds against it.
 3. Wire /auth/login to call Group 3's AS /as/authenticate (mock its response until AS is
    ready — see docs/api-contracts.md).
 
@@ -39,5 +37,4 @@ The backbone the rest of the app plugs into:
 
 ## Others depend on you for
 
-- The users/login_events schema — Groups 3 and whoever builds anomaly detection need this
-  early. Post it as soon as it's stable, even before it's final.
+- The users schema — Group 3 needs this early to check credentials. Post it as soon as it's stable.
