@@ -1,36 +1,73 @@
 # Group 3 — Kerberos Core (Phase 1)
 
-Members: Sahil, Bhumika
-Folders you own: backend/kerberos-as/
+Members: Sahil, Bhumika  
+Folders owned: `backend/kerberos-as/`, `backend/kerberos-tgs/`
 
-This is the heart of the "Kerberos" part of the project. Read docs/crypto-interface.md
-fully before starting — you build tickets using Group 4's encrypt/decrypt/etc., not your
-own crypto code.
+Status: **Implemented & Verified** (51 automated tests passing across system)
 
-## What you're building
+---
 
-- Authentication Server (AS): /as/authenticate — verifies the user (via
-  Group 1's database/user store), generates a TGT (encrypted JSON payload — see
-  crypto-interface.md for the exact shape), returns it with an expiry.
+## What is Built
 
-*Note: Ticket Granting Server (TGS) is deferred to Phase 2.*
+- **Bhumika — Authentication Server (AS — Port 8001):**
+  - Endpoint: `POST /as/authenticate`
+  - Verifies credentials using Argon2id (`crypto_utils.verify_password`).
+  - Supports fallback user store (`alice`, `bob`) and integrates dynamically with Group 1's database once delivered.
+  - Generates 32-byte Client↔TGS session key.
+  - Generates and encrypts TGT with `AS_TGS_SHARED_KEY` (AES-256-GCM).
+  - Returns `{tgt, tgt_expiry, session_key, client_id}`.
 
-## First tasks
+- **Sahil — Ticket Granting Server (TGS — Port 8002):**
+  - Endpoint: `POST /tgs/service-ticket`
+  - Base64-decodes and decrypts incoming TGT with `AS_TGS_SHARED_KEY`.
+  - Rejects tampered, corrupt, or foreign-keyed TGTs with HTTP 401 (`DecryptionError`).
+  - Validates ticket expiration, clock skew window ($\pm 300\text{s}$), and client request freshness timestamp (replay defense).
+  - Issues 32-byte Client↔Service session key.
+  - Generates Service Ticket matching Group 4 contract, encrypted with `TGS_SERVICE_SHARED_KEY` (AES-256-GCM).
+  - Returns `{service_ticket, expiry, session_key, service_id}`.
 
-1. Stand up AS service (backend/kerberos-as port 8001), confirm /health.
-2. Agree on the exact TGT JSON fields with each other and with Group 4
-   (the shape in crypto-interface.md is a starting point, not final).
-3. Build /as/authenticate against Group 1's user table (ask Group 1 for read access /
-   the schema).
+---
 
-## Depends on
+## Wire Contracts & Ticket Formats
 
-- Group 4's crypto_utils.py (encrypt, decrypt, generate_key) — this blocks real ticket
-  generation, so coordinate early; build your endpoint skeletons and request/response shapes
-  in parallel while waiting.
-- Group 1's user table/schema for AS to check credentials against.
-- The AS↔TGS shared key, defined in .env (AS_TGS_SHARED_KEY).
+### 1. TGT Payload (Encrypted with `AS_TGS_SHARED_KEY`):
+```json
+{
+  "client_id": "alice",
+  "tgs_id": "kerberos-tgs",
+  "session_key": "base64_encoded_32_byte_key",
+  "issued_at": 1790000000,
+  "expiry": 1790003600
+}
+```
 
-## Others depend on you for
+### 2. Service Ticket Payload (Encrypted with `TGS_SERVICE_SHARED_KEY`):
+```json
+{
+  "client_id": "alice",
+  "service_id": "service-server",
+  "session_key": "base64_encoded_32_byte_key",
+  "issued_at": 1790000000,
+  "expiry": 1790000600
+}
+```
 
-- Group 1 (Core API) needs your AS response shape to finish /auth/login.
+---
+
+## How to Run & Test
+
+```powershell
+# 1. Run all tests (AS, TGS, Service Server, E2E)
+pytest backend/ -v
+
+# 2. Run standalone demonstration script
+python scripts/verify_kerberos_pipeline.py
+
+# 3. Launch live servers
+# Terminal 1:
+python -m uvicorn main:app --app-dir backend/kerberos-as --reload --port 8001
+# Terminal 2:
+python -m uvicorn main:app --app-dir backend/kerberos-tgs --reload --port 8002
+# Terminal 3:
+python -m uvicorn main:app --app-dir backend/service-server --reload --port 8003
+```
